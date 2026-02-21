@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { generateCharacterSprite, generateBackgroundMusic } from '../../services/ai';
 
 export default class OverworldScene extends Phaser.Scene {
     private player!: Phaser.Physics.Arcade.Sprite;
@@ -70,6 +71,41 @@ export default class OverworldScene extends Phaser.Scene {
             window.removeEventListener('world-minigame-open', this.onMiniGameOpen);
             window.removeEventListener('world-minigame-close', this.onMiniGameClose);
         });
+
+        this.loadAIAssests();
+    }
+
+    private async loadAIAssests() {
+        try {
+            const bgmUrl = await generateBackgroundMusic("An energetic and adventurous retro RPG overworld theme, chiptune");
+            if (bgmUrl) {
+                this.load.audio('lyriaBGM', bgmUrl);
+                this.load.once('complete', () => {
+                    if (this.sound.get('lyriaBGM')) return;
+                    this.sound.play('lyriaBGM', { loop: true, volume: 0.5 });
+                });
+                this.load.start();
+            }
+        } catch (e) {
+            console.error("Failed to load AI BGM", e);
+        }
+
+        try {
+            const prompt = "A 2d pixel art character sprite for a top-down RPG game, clean lines, solid white background, cute hero, detailed 32x32 style";
+            const imageUrl = await generateCharacterSprite(prompt);
+
+            if (imageUrl) {
+                this.textures.addBase64('aiPlayer', imageUrl);
+                this.textures.on('addtexture', (textureKey: string) => {
+                    if (textureKey === 'aiPlayer') {
+                        this.player.setTexture('aiPlayer');
+                        this.player.setDisplaySize(32, 32);
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Failed to load AI sprite", e);
+        }
     }
 
     update() {
