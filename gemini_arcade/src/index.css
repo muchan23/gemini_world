@@ -1,0 +1,29 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Titan+One&family=Nunito:wght@400;700;900&display=swap');
+
+@layer components {
+  .brawl-btn {
+    @apply relative border-b-8 border-r-4 border-black rounded-xl font-black text-white transform transition-all active:border-b-0 active:border-r-0 active:translate-y-2 uppercase tracking-wider px-6 py-2;
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.5);
+  }
+  
+  .brawl-card {
+    @apply bg-white border-4 border-black rounded-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)];
+  }
+
+  .game-container-border {
+    @apply border-8 border-black rounded-3xl shadow-[0px_0px_0px_4px_#ffffff,0px_10px_20px_rgba(0,0,0,0.5)];
+  }
+
+  .supercell-font {
+    font-family: 'Titan One', cursive;
+    letter-spacing: 1px;
+  }
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  font-family: 'Nunito', sans-serif;
+  background-color: #1a1a2e;
+}
