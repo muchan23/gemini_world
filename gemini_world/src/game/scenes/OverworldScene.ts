@@ -9,47 +9,45 @@ export default class OverworldScene extends Phaser.Scene {
         left: Phaser.Input.Keyboard.Key;
         right: Phaser.Input.Keyboard.Key;
     };
+    private currentZone: string | null = null;
+    private triggerGroup!: Phaser.Physics.Arcade.Group;
+    private isControlLocked = false;
+    private onMiniGameOpen = () => {
+        this.isControlLocked = true;
+        this.player.setVelocity(0, 0);
+    };
+    private onMiniGameClose = () => {
+        this.isControlLocked = false;
+    };
 
     constructor() {
         super('OverworldScene');
     }
 
     preload() {
-        // Generate placeholder texture for the grid floor
         this.createPlaceholderTextures();
     }
 
     create() {
         console.log('[OverworldScene] create() called');
-        // Set background color to a darker cyber-aesthetic tone
         this.cameras.main.setBackgroundColor('#1e1e24');
-
-        // Create a 2000x2000 world bounds
         this.physics.world.setBounds(0, 0, 2000, 2000);
-
-        // Add a simple tileSprite to act as the floor grid
         this.add.tileSprite(1000, 1000, 2000, 2000, 'floorGrid');
 
-
-        // Create a simple player placeholder
         this.player = this.physics.add.sprite(1000, 1000, 'playerTemp');
         this.player.setCollideWorldBounds(true);
 
-        // Draw the 5 main zones (must happen after player exists for overlap wiring)
         this.createZones();
 
-        // Setup camera
         this.cameras.main.setBounds(0, 0, 2000, 2000);
         this.cameras.main.startFollow(this.player, true, 0.05, 0.05);
 
-        // Setup UI Layer and text
-        const uiText = this.add.text(20, 20, 'The Gemini World: Overworld', {
+        this.add.text(20, 20, 'The Gemini World: Overworld', {
             fontSize: '24px',
             color: '#ffffff',
             fontFamily: 'system-ui'
-        }).setScrollFactor(0); // Sticks to the camera UI layer
+        }).setScrollFactor(0);
 
-        // Setup input
         if (this.input.keyboard) {
             this.cursors = this.input.keyboard.createCursorKeys();
             this.wasd = this.input.keyboard.addKeys({
@@ -57,17 +55,28 @@ export default class OverworldScene extends Phaser.Scene {
                 down: Phaser.Input.Keyboard.KeyCodes.S,
                 left: Phaser.Input.Keyboard.KeyCodes.A,
                 right: Phaser.Input.Keyboard.KeyCodes.D
-            }) as any;
+            }) as {
+                up: Phaser.Input.Keyboard.Key;
+                down: Phaser.Input.Keyboard.Key;
+                left: Phaser.Input.Keyboard.Key;
+                right: Phaser.Input.Keyboard.Key;
+            };
         }
+
+        window.addEventListener('world-minigame-open', this.onMiniGameOpen);
+        window.addEventListener('world-minigame-close', this.onMiniGameClose);
+
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            window.removeEventListener('world-minigame-open', this.onMiniGameOpen);
+            window.removeEventListener('world-minigame-close', this.onMiniGameClose);
+        });
     }
 
     update() {
-        // Simple 8-way movement logic
         const speed = 300;
         this.player.setVelocity(0);
 
-        // Ensure we have cursors available
-        if (!this.cursors || !this.wasd) return;
+        if (!this.cursors || !this.wasd || this.isControlLocked) return;
 
         const isLeft = this.cursors.left.isDown || this.wasd.left.isDown;
         const isRight = this.cursors.right.isDown || this.wasd.right.isDown;
@@ -90,11 +99,10 @@ export default class OverworldScene extends Phaser.Scene {
             this.player.setRotation(Math.PI / 2);
         }
 
-        // Normalize diagonal movement speed and set rotation
-        if (this.player.body?.velocity.x !== 0 && this.player.body?.velocity.y !== 0) {
-            this.player.body.velocity.normalize().scale(speed);
+        const body = this.player.body as Phaser.Physics.Arcade.Body | null;
+        if (body && body.velocity.x !== 0 && body.velocity.y !== 0) {
+            body.velocity.normalize().scale(speed);
 
-            // Fix diagonal rotations
             if (isUp && isRight) this.player.setRotation(-Math.PI / 4);
             if (isUp && isLeft) this.player.setRotation(-3 * Math.PI / 4);
             if (isDown && isRight) this.player.setRotation(Math.PI / 4);
@@ -106,12 +114,11 @@ export default class OverworldScene extends Phaser.Scene {
 
     private checkZoneExit() {
         if (this.currentZone !== null) {
-            // Find the specific trigger body the player was in
-            const activeTriggers = this.triggerGroup.getChildren().filter((trigger: any) => trigger.zoneId === this.currentZone);
+            const activeTriggers = this.triggerGroup.getChildren().filter((trigger) => (trigger as Phaser.GameObjects.Zone & { zoneId?: string }).zoneId === this.currentZone);
 
             let isStillOverlapping = false;
             for (const trigger of activeTriggers) {
-                if (this.physics.overlap(this.player, trigger)) {
+                if (this.physics.overlap(this.player, trigger as Phaser.GameObjects.GameObject)) {
                     isStillOverlapping = true;
                     break;
                 }
@@ -124,31 +131,21 @@ export default class OverworldScene extends Phaser.Scene {
         }
     }
 
-    /**
-     * Generates basic geometric textures in-memory so we don't
-     * need external image files to start testing.
-     */
     private createPlaceholderTextures() {
         const graphics = this.make.graphics({ x: 0, y: 0 });
 
-        // 1. Floor grid tile
         graphics.lineStyle(2, 0x333333, 0.5);
         graphics.strokeRect(0, 0, 64, 64);
         graphics.generateTexture('floorGrid', 64, 64);
         graphics.clear();
 
-        // 2. Player temporary sprite (Cyan Circle)
         graphics.fillStyle(0x00ffff, 1);
         graphics.fillCircle(16, 16, 16);
-        // Draw a little directional indicator
         graphics.fillStyle(0xffffff, 1);
         graphics.fillRect(16, 12, 16, 8);
         graphics.generateTexture('playerTemp', 32, 32);
         graphics.clear();
     }
-
-    private currentZone: string | null = null;
-    private triggerGroup!: Phaser.Physics.Arcade.Group;
 
     private createZones() {
         const graphics = this.add.graphics();
@@ -162,27 +159,31 @@ export default class OverworldScene extends Phaser.Scene {
 
         this.triggerGroup = this.physics.add.group();
 
-        zones.forEach(zone => {
-            // Draw zone background
+        zones.forEach((zone) => {
             graphics.fillStyle(zone.color, 0.2);
             graphics.lineStyle(4, zone.color, 0.8);
             graphics.fillRect(zone.x - 200, zone.y - 150, 400, 300);
             graphics.strokeRect(zone.x - 200, zone.y - 150, 400, 300);
 
-            // Add a visual 'interaction pad' in front
             graphics.fillStyle(0xffffff, 0.5);
             graphics.fillCircle(zone.x, zone.y + 120, 30);
 
-            // Create invisible physics body for the interaction pad
-            const trigger = this.add.zone(zone.x, zone.y + 120, 80, 80);
+            const trigger = this.add.zone(zone.x, zone.y, 400, 300);
             this.physics.add.existing(trigger);
-            // @ts-ignore - store metadata on the trigger
-            trigger.zoneId = zone.id;
-            // @ts-ignore
-            trigger.zoneName = zone.name;
-            this.triggerGroup.add(trigger);
 
-            // Add Zone Text
+            const typedTrigger = trigger as Phaser.GameObjects.Zone & {
+                body: Phaser.Physics.Arcade.Body;
+                zoneId: string;
+                zoneName: string;
+            };
+
+            typedTrigger.zoneId = zone.id;
+            typedTrigger.zoneName = zone.name;
+            typedTrigger.body.setAllowGravity(false);
+            typedTrigger.body.setImmovable(true);
+
+            this.triggerGroup.add(typedTrigger);
+
             this.add.text(zone.x, zone.y - 50, zone.name, {
                 fontSize: '28px',
                 color: '#ffffff',
@@ -191,13 +192,14 @@ export default class OverworldScene extends Phaser.Scene {
             }).setOrigin(0.5);
         });
 
-        // Add overlap detection between player and trigger zones
-        this.physics.add.overlap(this.player, this.triggerGroup, (_player, trigger: any) => {
-            console.log(`[OverworldScene] Overlap detected with trigger! Zone ID: ${trigger.zoneId}`);
+        this.physics.add.overlap(this.player, this.triggerGroup, (_player, rawTrigger) => {
+            const trigger = rawTrigger as Phaser.GameObjects.Zone & {
+                zoneId: string;
+                zoneName: string;
+            };
+
             if (this.currentZone !== trigger.zoneId) {
-                console.log(`[OverworldScene] Entering new zone: ${trigger.zoneId}`);
                 this.currentZone = trigger.zoneId;
-                // Dispatch a custom DOM event for React to pick up
                 window.dispatchEvent(new CustomEvent('overworld-zone-enter', {
                     detail: { zoneId: trigger.zoneId, zoneName: trigger.zoneName }
                 }));
